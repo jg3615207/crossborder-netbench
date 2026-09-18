@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 CrossBorder NetBench - All-in-One Network Benchmark Suite
 Supports Windows, macOS, Linux, and Android.
@@ -178,8 +178,18 @@ def run_host_mode(args):
     print(f"  -> HTTP Sink      : Port {args.http_port} (TCP)")
     print("=" * 70)
 
+    # Locate iPerf3 executable (checking PATH and WinGet default install location)
+    import shutil
+    import glob
+    iperf_bin = shutil.which("iperf3")
+    if not iperf_bin and platform.system() == "Windows":
+        winget_pattern = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet", "Packages", "*iperf*", "iperf3.exe")
+        matches = glob.glob(winget_pattern)
+        if matches:
+            iperf_bin = matches[0]
+
     # Launch iPerf3 Server
-    iperf_cmd = ["iperf3", "-s", "-p", str(args.iperf_port), "-V"]
+    iperf_cmd = [iperf_bin or "iperf3", "-s", "-p", str(args.iperf_port), "-V"]
     iperf_proc = None
     try:
         iperf_proc = subprocess.Popen(iperf_cmd)
