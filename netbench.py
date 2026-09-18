@@ -379,7 +379,8 @@ def main():
 
     # Client subparser
     client_parser = subparsers.add_parser("client", help="Run as Benchmark Client (Sender)")
-    client_parser.add_argument("--target", "-t", type=str, required=True, help="Target host IP or domain")
+    client_parser.add_argument("target_pos", nargs="?", default=None, help="Target host IP or domain (positional)")
+    client_parser.add_argument("--target", "-t", type=str, default=None, help="Target host IP or domain")
     client_parser.add_argument("--payload-gb", "-g", type=float, default=2.0, help="Payload size in GB for real upload test (default: 2.0)")
     client_parser.add_argument("--duration", "-d", type=int, default=300, help="Duration in seconds for sustained iPerf3 test (default: 300)")
     client_parser.add_argument("--http-port", type=int, default=DEFAULT_HTTP_PORT, help="Host HTTP port (default: 9000)")
@@ -415,10 +416,39 @@ def main():
             print("Invalid selection.")
             sys.exit(1)
 
-    args = parser.parse_args()
+    # Pre-process arguments to normalize `--client` -> `client`, `--host` -> `host`
+    raw_args = sys.argv[1:]
+    normalized_args = []
+    mode_detected = None
+
+    for a in raw_args:
+        if a in ("--client", "-client", "client"):
+            if not mode_detected:
+                normalized_args.append("client")
+                mode_detected = "client"
+        elif a in ("--host", "-host", "host"):
+            if not mode_detected:
+                normalized_args.append("host")
+                mode_detected = "host"
+        else:
+            normalized_args.append(a)
+
+    # If user just ran `netbench 100.88.166.97`, default to client mode
+    if not mode_detected and normalized_args:
+        first = normalized_args[0]
+        if not first.startswith("-"):
+            normalized_args.insert(0, "client")
+
+    args = parser.parse_args(normalized_args)
     if args.mode == "host":
         run_host_mode(args)
     elif args.mode == "client":
+        # Resolve target from either positional or --target
+        target = getattr(args, "target", None) or getattr(args, "target_pos", None)
+        if not target:
+            print("[!] Error: Target IP or domain required. Example: netbench client 100.88.166.97")
+            sys.exit(1)
+        args.target = target
         run_client_mode(args)
     else:
         parser.print_help()

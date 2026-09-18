@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # ==============================================================================
 # Cross-Border Sustained Throughput & Stability Benchmark (macOS Client)
 # Designed for testing media upload performance, GFW throttling, and packet loss
