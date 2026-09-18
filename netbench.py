@@ -229,6 +229,9 @@ class MemoryStreamReader:
         self.bytes_sent = 0
         self.chunk_size = chunk_size
         self._pattern = os.urandom(chunk_size)
+        self.start_t = time.time()
+        self.last_log_t = self.start_t
+        self.last_log_bytes = 0
 
     def read(self, size=-1):
         if self.bytes_sent >= self.total_bytes:
@@ -236,6 +239,17 @@ class MemoryStreamReader:
         remaining = self.total_bytes - self.bytes_sent
         to_read = min(self.chunk_size, remaining) if size < 0 else min(size, remaining)
         self.bytes_sent += to_read
+
+        now = time.time()
+        if now - self.last_log_t >= 2.0:
+            speed_mbps = ((self.bytes_sent - self.last_log_bytes) * 8) / ((now - self.last_log_t) * 1_000_000)
+            avg_mbps = (self.bytes_sent * 8) / ((now - self.start_t) * 1_000_000)
+            pct = (self.bytes_sent / self.total_bytes) * 100
+            sys.stdout.write(f"\r  Uploading: {self.bytes_sent / (1024*1024):.1f} MB / {self.total_bytes / (1024*1024):.1f} MB ({pct:.1f}%) | Inst: {speed_mbps:.2f} Mbps | Avg: {avg_mbps:.2f} Mbps ")
+            sys.stdout.flush()
+            self.last_log_t = now
+            self.last_log_bytes = self.bytes_sent
+
         return self._pattern[:to_read]
 
 def run_client_mode(args):
