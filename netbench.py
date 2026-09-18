@@ -281,13 +281,34 @@ def run_client_mode(args):
     except FileNotFoundError:
         pass
 
-    if has_mtr:
-        print("  Running MTR (300 cycles / ~5 minutes)...")
-        mtr_cmd = ["sudo", "mtr", "--report", "--report-cycles", "300", "--no-dns", target] if platform.system() != "Windows" else ["mtr", "-r", "-c", "300", target]
+    if getattr(args, "skip_mtr", False):
+        print("  [Step 2 Skipped via --skip-mtr]")
+    elif has_mtr:
+        cycles = getattr(args, "mtr_cycles", 100)
+        print(f"  Running MTR ({cycles} cycles / ~{cycles} seconds)...")
+        print(f"  [Active] Probing network hops in background. Please wait...", flush=True)
+        mtr_cmd = ["sudo", "mtr", "--report", "--report-cycles", str(cycles), "--no-dns", target] if platform.system() != "Windows" else ["mtr", "-r", "-c", str(cycles), target]
         try:
             with open(mtr_file, "w") as f:
-                subprocess.run(mtr_cmd, stdout=f, check=True)
-            print(f"  [OK] MTR report saved to {mtr_file}")
+                proc = subprocess.Popen(mtr_cmd, stdout=f, stderr=subprocess.PIPE)
+                start_mtr = time.time()
+                while proc.poll() is None:
+                    elapsed = int(time.time() - start_mtr)
+                    sys.stdout.write(f"\r  MTR In Progress: {elapsed}s / {cycles}s elapsed... ")
+                    sys.stdout.flush()
+                    time.sleep(1)
+                sys.stdout.write("\n")
+                if proc.returncode == 0:
+                    print(f"  [OK] MTR report saved to {mtr_file}")
+                    # Print summary of MTR report to console
+                    try:
+                        with open(mtr_file, "r") as mf:
+                            print("\n" + mf.read().strip() + "\n")
+                    except Exception:
+                        pass
+                else:
+                    _, err = proc.communicate()
+                    print(f"  [!] MTR finished with notice: {err.decode('utf-8', errors='ignore').strip()}")
         except Exception as e:
             print(f"  [!] MTR execution notice: {e}")
     else:
@@ -383,6 +404,8 @@ def main():
     client_parser.add_argument("--target", "-t", type=str, default=None, help="Target host IP or domain")
     client_parser.add_argument("--payload-gb", "-g", type=float, default=2.0, help="Payload size in GB for real upload test (default: 2.0)")
     client_parser.add_argument("--duration", "-d", type=int, default=300, help="Duration in seconds for sustained iPerf3 test (default: 300)")
+    client_parser.add_argument("--skip-mtr", action="store_true", help="Skip the MTR hop loss test and jump straight to speed/payload tests")
+    client_parser.add_argument("--mtr-cycles", type=int, default=100, help="Number of MTR cycles to run (default: 100 cycles / ~100s)")
     client_parser.add_argument("--http-port", type=int, default=DEFAULT_HTTP_PORT, help="Host HTTP port (default: 9000)")
     client_parser.add_argument("--iperf-port", type=int, default=DEFAULT_IPERF_PORT, help="Host iPerf3 port (default: 5201)")
 
