@@ -19,6 +19,12 @@ import time
 import urllib.request
 from datetime import datetime
 
+# Prevent Windows console charmap UnicodeEncodeErrors
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 DEFAULT_HTTP_PORT = 9000
 DEFAULT_IPERF_PORT = 5201
 
@@ -115,7 +121,7 @@ class UploadSinkHandler(http.server.BaseHTTPRequestHandler):
             duration = max(time.time() - start_time, 0.001)
             mbps = (total_bytes * 8) / (duration * 1_000_000)
             mbytes = total_bytes / (1024 * 1024)
-            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] [✓] Transfer Finished Successfully!")
+            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] [OK] Transfer Finished Successfully!")
             print(f"[{datetime.now().strftime('%H:%M:%S')}]     Total: {mbytes:.2f} MB in {duration:.2f}s | Avg Throughput: {mbps:.2f} Mbps ({mbytes/duration:.2f} MB/s)")
 
             self.send_response(200)
@@ -193,7 +199,7 @@ def run_host_mode(args):
     iperf_proc = None
     try:
         iperf_proc = subprocess.Popen(iperf_cmd)
-        print(f"[✓] iPerf3 server started (PID: {iperf_proc.pid})")
+        print(f"[OK] iPerf3 server started (PID: {iperf_proc.pid})")
     except FileNotFoundError:
         print(f"[!] Warning: 'iperf3' executable was not found in PATH.")
         print(f"    Make sure iPerf3 is installed. (Windows: winget install ar51an.iPerf3 | Mac: brew install iperf3)")
@@ -201,7 +207,7 @@ def run_host_mode(args):
     # Launch HTTP Sink
     try:
         http_server = ThreadedHTTPServer(('0.0.0.0', args.http_port), UploadSinkHandler)
-        print(f"[✓] HTTP Upload Sink started on 0.0.0.0:{args.http_port}")
+        print(f"[OK] HTTP Upload Sink started on 0.0.0.0:{args.http_port}")
         print("\n[*] Host is ready and listening. Press Ctrl+C to terminate.\n")
         http_server.serve_forever()
     except KeyboardInterrupt:
@@ -210,7 +216,7 @@ def run_host_mode(args):
         if iperf_proc and iperf_proc.poll() is None:
             iperf_proc.terminate()
             iperf_proc.wait()
-        print("[✓] All servers stopped.")
+        print("[OK] All servers stopped.")
 
 # =====================================================================
 # CLIENT IMPLEMENTATION
@@ -257,7 +263,7 @@ def run_client_mode(args):
         req = urllib.request.Request(sink_url, headers={"User-Agent": "NetBench-Client"})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = resp.read().decode('utf-8')
-            print(f"  [✓] Host responded: {data.strip()}")
+            print(f"  [OK] Host responded: {data.strip()}")
     except Exception as e:
         print(f"  [!] Warning: Could not connect to {sink_url}: {e}")
         print("      Make sure host servers are running and firewall allows port 9000.")
@@ -281,7 +287,7 @@ def run_client_mode(args):
         try:
             with open(mtr_file, "w") as f:
                 subprocess.run(mtr_cmd, stdout=f, check=True)
-            print(f"  [✓] MTR report saved to {mtr_file}")
+            print(f"  [OK] MTR report saved to {mtr_file}")
         except Exception as e:
             print(f"  [!] MTR execution notice: {e}")
     else:
@@ -290,7 +296,7 @@ def run_client_mode(args):
         try:
             with open(mtr_file, "w") as f:
                 subprocess.run(trace_cmd, stdout=f)
-            print(f"  [✓] Traceroute saved to {mtr_file}")
+            print(f"  [OK] Traceroute saved to {mtr_file}")
         except Exception as e:
             print(f"  [!] Traceroute failed: {e}")
 
@@ -346,7 +352,7 @@ def run_client_mode(args):
             total_time = max(time.time() - start_t, 0.001)
             mbps = (payload_bytes * 8) / (total_time * 1_000_000)
             mbytes = payload_bytes / (1024 * 1024)
-            print(f"\n  [✓] Upload Completed: {mbytes:.2f} MB in {total_time:.2f}s (Avg: {mbps:.2f} Mbps / {mbytes/total_time:.2f} MB/s)")
+            print(f"\n  [OK] Upload Completed: {mbytes:.2f} MB in {total_time:.2f}s (Avg: {mbps:.2f} Mbps / {mbytes/total_time:.2f} MB/s)")
             print(f"      Host Response: {resp_body.strip()}")
             
             with open(os.path.join(report_dir, "04_payload_result.txt"), "w") as f:
